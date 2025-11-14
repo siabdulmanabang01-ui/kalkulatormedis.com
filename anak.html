@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalkulator Luka Bakar Anak (Lund–Browder + Parkland)</title>
+<style>
+:root {
+  --utama:#2a9d8f;
+  --muda:#e9f8f7;
+  --teks:#2b2b2b;
+  --putih:#ffffff;
+  --border:#c9e8e4;
+}
+body {
+  font-family:'Poppins',sans-serif;
+  background:linear-gradient(to bottom,#f3fcfc,#d7f0ec);
+  color:var(--teks);
+  margin:0;
+  padding:0;
+}
+.container {
+  max-width:950px;
+  margin:30px auto;
+  background:var(--putih);
+  border-radius:18px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.1);
+  padding:25px;
+}
+header {
+  text-align:center;
+  margin-bottom:25px;
+}
+header h1 {
+  color:var(--utama);
+  font-size:1.8rem;
+}
+.grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:25px;
+}
+@media(max-width:800px){
+  .grid{grid-template-columns:1fr;}
+}
+label {
+  font-weight:600;
+  display:block;
+  margin-top:10px;
+}
+input[type=number] {
+  width:100%;
+  padding:10px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  margin-top:6px;
+}
+button {
+  width:100%;
+  background:var(--utama);
+  color:white;
+  border:none;
+  border-radius:10px;
+  padding:12px;
+  font-weight:600;
+  margin-top:15px;
+  cursor:pointer;
+}
+button:hover { background:#21867a; }
+.section-title {
+  margin-top:15px;
+  font-weight:700;
+  color:var(--utama);
+  border-bottom:2px solid var(--utama);
+  padding-bottom:4px;
+}
+.group {
+  background:var(--muda);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px;
+  margin-top:8px;
+}
+.group h4 {
+  margin:0;
+  font-size:1rem;
+  color:var(--utama);
+}
+.area-buttons {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:8px;
+}
+.area-btn {
+  background:white;
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:6px 10px;
+  cursor:pointer;
+  font-size:0.9rem;
+  transition:0.2s;
+}
+.area-btn.active {
+  background:var(--utama);
+  color:white;
+  border-color:var(--utama);
+}
+.result-box {
+  background:#f8fdfc;
+  border-left:4px solid var(--utama);
+  padding:15px;
+  border-radius:10px;
+  margin-top:20px;
+}
+.result-box h3 {
+  color:var(--utama);
+  margin-top:0;
+}
+table {
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+th,td {
+  border:1px solid #ddd;
+  padding:8px;
+  text-align:center;
+}
+th {
+  background:var(--utama);
+  color:white;
+}
+.note {
+  font-size:0.85rem;
+  color:#555;
+  margin-top:5px;
+}
+pre {
+  background:#f1f8f7;
+  padding:10px;
+  border-left:4px solid var(--utama);
+  border-radius:6px;
+  white-space:pre-wrap;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <h1>Kalkulator Luka Bakar Anak</h1>
+  <p>Berbasis <b>Metode Lund–Browder</b> dan <b>Rumus Parkland (versi konservatif 2024)</b></p>
+</header>
+
+<div class="grid">
+  <div>
+    <label>Usia Anak (tahun)</label>
+    <input type="number" id="age" min="0" value="5" onchange="updateFactor();renderAreas();">
+    
+    <label>Berat Badan (kg)</label>
+    <input type="number" id="weight" min="1" value="15">
+
+    <label><input type="checkbox" id="inhalation" onchange="updateFactor()"> Cedera Inhalasi</label>
+    <p class="note">Tambahkan 10–15% cairan bila ada cedera inhalasi.</p>
+
+    <label>Faktor Parkland (mL/kg/%TBSA)</label>
+    <input type="number" id="factor" step="0.1" value="3.5">
+
+    <label><input type="checkbox" id="maintenance" checked> Tambahkan cairan maintenance (Holliday–Segar)</label>
+
+    <button onclick="calculate()">💧 Hitung Kebutuhan Cairan</button>
+  </div>
+
+  <div>
+    <div class="section-title">Pilih Area Luka Bakar</div>
+    <div id="areas"></div>
+  </div>
+</div>
+
+<div id="result" style="display:none;" class="result-box">
+  <h3>💡 Hasil Perhitungan</h3>
+  <div id="resultText"></div>
+
+  <h4>Rincian Jenis & Jumlah Cairan</h4>
+  <table>
+    <thead>
+      <tr><th>Kategori</th><th>Jenis Cairan</th><th>Jumlah (mL)</th><th>Keterangan</th></tr>
+    </thead>
+    <tbody id="resultTable"></tbody>
+  </table>
+
+  <h4>📋 Ringkasan Waktu Pemberian</h4>
+  <pre id="resultSummary"></pre>
+
+  <p class="note">📚 Sumber: <em>Fluid and Burns in Children (German Burn Registry, 2024)</em></p>
+</div>
+</div>
+
+<script>
+const chart = {
+  '0':{kepala:19,leher:2,badan_depan:13,badan_belakang:13,lengan_atas:4,lengan_bawah:3,tangan:2.5,paha:5.5,betis:5,kaki:3.5,perineum:1},
+  '1':{kepala:17,leher:2,badan_depan:13,badan_belakang:13,lengan_atas:4,lengan_bawah:3,tangan:2.5,paha:6,betis:5.5,kaki:4,perineum:1},
+  '5':{kepala:13,leher:2,badan_depan:13,badan_belakang:13,lengan_atas:4,lengan_bawah:3,tangan:2,paha:6,betis:6,kaki:6,perineum:1},
+  '10':{kepala:10,leher:2,badan_depan:13,badan_belakang:13,lengan_atas:4,lengan_bawah:3,tangan:2,paha:7,betis:6,kaki:6,perineum:1},
+  '15':{kepala:7,leher:2,badan_depan:13,badan_belakang:13,lengan_atas:4,lengan_bawah:3,tangan:2,paha:7,betis:6,kaki:6,perineum:1}
+};
+let selected={};
+
+function getGroup(age){
+  if(age<1)return'0';
+  if(age<3)return'1';
+  if(age<8)return'5';
+  if(age<13)return'10';
+  return'15';
+}
+
+function updateFactor(){
+  const age=parseFloat(document.getElementById("age").value)||0;
+  let factor=(age<4)?3.3:3.5;
+  if(document.getElementById("inhalation").checked)factor*=1.1;
+  document.getElementById("factor").value=factor.toFixed(1);
+}
+
+function renderAreas(){
+  const age=parseFloat(document.getElementById("age").value)||5;
+  const group=getGroup(age);
+  const c=chart[group];
+  const container=document.getElementById("areas");
+  container.innerHTML="";
+  const groups={
+    "Kepala & Leher":["kepala","leher"],
+    "Badan":["badan_depan","badan_belakang"],
+    "Ekstremitas Atas (Kiri & Kanan)":[
+      "lengan_atas_kiri","lengan_bawah_kiri","tangan_kiri",
+      "lengan_atas_kanan","lengan_bawah_kanan","tangan_kanan"
+    ],
+    "Ekstremitas Bawah (Kiri & Kanan)":[
+      "paha_kiri","betis_kiri","kaki_kiri",
+      "paha_kanan","betis_kanan","kaki_kanan"
+    ],
+    "Perineum":["perineum"]
+  };
+
+  Object.entries(groups).forEach(([title,parts])=>{
+    const div=document.createElement("div");
+    div.className="group";
+    const h=document.createElement("h4");
+    h.textContent=title;
+    div.appendChild(h);
+    const areaDiv=document.createElement("div");
+    areaDiv.className="area-buttons";
+
+    parts.forEach(p=>{
+      const base=p.replace("_kiri","").replace("_kanan","");
+      const percent=c[base]||0;
+      const b=document.createElement("div");
+      b.textContent = `${p.replaceAll('_',' ')} (${percent}%)`;
+      b.className="area-btn";
+      b.onclick=()=>{selected[p]=!selected[p];b.classList.toggle("active",selected[p]);};
+      areaDiv.appendChild(b);
+    });
+    div.appendChild(areaDiv);
+    container.appendChild(div);
+  });
+}
+
+function calcTbsa(){
+  const age=parseFloat(document.getElementById("age").value)||5;
+  const c=chart[getGroup(age)];
+  let total=0;
+  for(let p in selected) if(selected[p]){
+    const base=p.replace("_kiri","").replace("_kanan","");
+    total+=c[base]||0;
+  }
+  return total;
+}
+
+function hollidaySegar(kg){
+  if(kg<=10)return kg*100;
+  if(kg<=20)return 1000+(kg-10)*50;
+  return 1500+(kg-20)*20;
+}
+
+function calculate(){
+  const weight=parseFloat(document.getElementById("weight").value);
+  const tbsa=calcTbsa();
+  const factor=parseFloat(document.getElementById("factor").value);
+  const useMaint=document.getElementById("maintenance").checked;
+
+  if(!weight||!tbsa){alert("Isi berat badan dan pilih area luka bakar.");return;}
+  const resus=factor*weight*tbsa;
+  const maintenance=useMaint?hollidaySegar(weight):0;
+  const total=resus+maintenance;
+
+  const period=[
+    {label:"0–8 jam pertama",value:resus*0.5,fluid:"Ringer Laktat (RL)"},
+    {label:"8–16 jam",value:resus*0.25,fluid:"Ringer Laktat (RL)"},
+    {label:"16–24 jam",value:resus*0.25,fluid:"RL + Koloid (bila perlu)"}
+  ];
+
+  const fluids=[
+    {kategori:"Kristaloid",jenis:"Ringer Laktat (RL)",jumlah:resus.toFixed(0),ket:`Resusitasi (${factor} mL/kg/%TBSA)`},
+    {kategori:"Kristaloid",jenis:"Dextrose 5% + RL",jumlah:maintenance.toFixed(0),ket:"Cairan maintenance (anak)"},
+    {kategori:"Koloid",jenis:"Albumin 5% / Plasma Expander",jumlah:(resus*0.25).toFixed(0),ket:"Mulai setelah 24 jam (bila perlu)"},
+    {kategori:"Total",jenis:"Semua cairan",jumlah:total.toFixed(0),ket:"Total 24 jam pertama"}
+  ];
+
+  document.getElementById("result").style.display="block";
+  document.getElementById("resultText").innerHTML=`
+    <p><b>Luas Luka Bakar (TBSA):</b> ${tbsa}%</p>
+    <p><b>Faktor Parkland:</b> ${factor} mL/kg/%TBSA</p>
+    ${period.map(p=>`<p><b>${p.label}:</b> ${p.value.toFixed(0)} mL (${p.fluid})</p>`).join('')}
+  `;
+
+  document.getElementById("resultTable").innerHTML=
+    fluids.map(f=>`<tr><td>${f.kategori}</td><td>${f.jenis}</td><td>${f.jumlah}</td><td>${f.ket}</td></tr>`).join('');
+
+  document.getElementById("resultSummary").textContent=
+    `TBSA: ${tbsa}%\nFaktor: ${factor} mL/kg/%TBSA\n0–8 jam: ${period[0].value.toFixed(0)} mL\n8–16 jam: ${period[1].value.toFixed(0)} mL\n16–24 jam: ${period[2].value.toFixed(0)} mL\nTotal 24 jam: ${total.toFixed(0)} mL`;
+}
+
+updateFactor();
+renderAreas();
+</script>
+</body>
+</html>
